@@ -11,9 +11,9 @@ password = app.config['DB_PASSWORD']
 
 try:
     con = fdb.connect(host=host, database=database, user=user, password=password)
-    print("Conexão estabelecida com sucesso")
+    print("Connected to Firebird!")
 except Exception as e:
-    print(f"Erro ao conectar ao banco de dados: {e}")
+    print(f"Error connecting to Firebird: {e}")
 
 from view import *
 
