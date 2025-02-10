@@ -6,3 +6,9 @@ class Livros:
         self.titulo = titulo
         self.autor = autor
         self.ano_publicado = ano_publicado
+class Usuarios:
+    def __init__(self, id_usuarios, nome, email, senha):
+        self.id_usuarios = id_usuarios
+        self.nome = nome
+        self.email = email
+        self.senha = senha
