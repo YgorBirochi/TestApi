@@ -4,12 +4,18 @@ from flask_bcrypt import generate_password_hash, check_password_hash
 import re
 import jwt
 
+app.config.from_pyfile('config.py')
 senha_secreta = app.config['SECRET_KEY']
 def generate_token(user_id):
     payload = {'id_usuario': user_id}
-    token = jwt.encode(payload,senha_secreta, algorithm='HGS256')
+    token = jwt.encode(payload, senha_secreta, algorithm='HS256')
     return token
+def remover_bearer(token):
 
+    if token.startswith('Bearer '):
+        return token[len('Bearer '):]
+    else:
+        return token
 @app.route('/livro', methods=['GET'])
 def livro():
     cur = con.cursor()
@@ -25,33 +31,54 @@ def livro():
     return jsonify(mensagem="Lista de Livros", livros=livros_dic)
 
 
-@app.route('/livro', methods=['POST'])
-def livro_post():
+@app.route('/livros', methods=['POST'])
+def criar_livro():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'mensagem': 'Token de autenticação necessário'}), 401
+
+    token = remover_bearer(token)
+    try:
+        payload = jwt.decode(token, senha_secreta, algorithms=['HS256'])
+        id_usuario = payload['id_usuario']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'mensagem': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'mensagem': 'Token inválido'}), 401
+
     data = request.get_json()
+
     titulo = data.get('titulo')
     autor = data.get('autor')
-    ano_publicado = data.get('ano_publicado')
+    ano_publicacao = data.get('ano_publicacao')
 
-    cur = con.cursor()
-    cur.execute("SELECT 1 FROM livros WHERE titulo = ?", (titulo,))
+    cursor = con.cursor()
 
-    if cur.fetchone():
-        return jsonify(mensagem="Livro já cadastrado"), 400
+    cursor.execute("SELECT 1 FROM livros WHERE TITULO = ?", (titulo,))
+    if cursor.fetchone():
+        return jsonify({"error": "Livro já cadastrado"}), 400
 
-    cur.execute("INSERT INTO livros (titulo, autor, ano_publicado) VALUES (?, ?, ?)",
-                (titulo, autor, ano_publicado))
+    cursor.execute("INSERT INTO livros (TITULO, AUTOR, ANO_PUBLICACAO) VALUES (?, ?, ?)",
+                   (titulo, autor, ano_publicacao))
     con.commit()
+    cursor.close()
 
     return jsonify({
-        'mensagem': 'Livro cadastrado com sucesso',
-        'livro': {'titulo': titulo, 'autor': autor, 'ano_publicado': ano_publicado}
+        'message': "Livro cadastrado com sucesso!",
+        'livro': {
+            'titulo': titulo,
+            'autor': autor,
+            'ano_publicacao': ano_publicacao
+        }
     }), 201
+
 
 @app.route('/livro_imagem', methods=['POST'])
 def livro_imagem():
     token = request.headers.get('Authorization')
     if not token:
-        return jsonify({'mensagem': 'Token de autenticação necessário'})
+        return jsonify({'mensagem': 'Token de autenticação necessário'}), 401
+
     token = remover_bearer(token)
 
     try:
@@ -62,6 +89,14 @@ def livro_imagem():
     except jwt.InvalidTokenError:
         return jsonify({'mensagem': 'Token inválido'}), 401
 
+    if 'imagem' not in request.files:
+        return jsonify({'mensagem': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['imagem']
+    if arquivo.filename == '':
+        return jsonify({'mensagem': 'Nome de arquivo inválido'}), 400
+
+    return jsonify({'mensagem': 'Imagem salva com sucesso', 'caminho': caminho}), 201
 @app.route('/livro/<int:id>', methods=['PUT'])
 def livro_put(id):
     cur = con.cursor()
@@ -181,22 +216,24 @@ def usuario_delete(id):
 
     return jsonify({'message': "Usuário excluído com sucesso!", 'id_usuario': id})
 
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     email = data.get('email')
     senha = data.get('senha')
-    cur = con.cursor()
-    cur.execute("SELECT senha, id_usuario FROM usuarios WHERE email = ? AND senha = ?", (email, senha, id_usuario))
-    senha = cur.fetcheone
-    cur.close()
+    cursor = con.cursor()
 
-    if not senha:
-        return jsonify({'error': "Email ou senha inválidos"}), 401
-    senha_hash = senha[0]
+    cursor.execute("SELECT senha, id_usuario FROM usuarios WHERE email = ?", (email,))
+    resultado = cursor.fetchone()
+    cursor.close()
+    if not resultado:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+    senha_hash = resultado[0]
+    id_usuario = resultado[1]
 
-    if not check_password_hash(senha_hash, senha):
+    if email and check_password_hash(senha_hash, senha):
         token = generate_token(id_usuario)
-        return jsonify({'error': "Email ou senha inválidos"}), 401
-
-    return jsonify({'mensagem': "Login realizado com sucesso"})
+        return jsonify({'mensagem': 'Login com sucesso', 'token': token}), 200
+    else:
+        return jsonify({'mensagem': 'Email ou senha inválido'}), 401
