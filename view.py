@@ -4,6 +4,11 @@ from flask_bcrypt import generate_password_hash, check_password_hash
 import re
 import jwt
 
+senha_secreta = app.config['SECRET_KEY']
+def generate_token(user_id):
+    payload = {'id_usuario': user_id}
+    token = jwt.encode(payload,senha_secreta, algorithm='HGS256')
+    return token
 
 @app.route('/livro', methods=['GET'])
 def livro():
@@ -161,13 +166,14 @@ def usuario_delete(id):
     con.commit()
 
     return jsonify({'message': "Usuário excluído com sucesso!", 'id_usuario': id})
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     email = data.get('email')
     senha = data.get('senha')
     cur = con.cursor()
-    cur.execute("SELECT senha FROM usuarios WHERE email = ? AND senha = ?", (email, senha))
+    cur.execute("SELECT senha, id_usuario FROM usuarios WHERE email = ? AND senha = ?", (email, senha, id_usuario))
     senha = cur.fetcheone
     cur.close()
 
@@ -176,6 +182,7 @@ def login():
     senha_hash = senha[0]
 
     if not check_password_hash(senha_hash, senha):
+        token = generate_token(id_usuario)
         return jsonify({'error': "Email ou senha inválidos"}), 401
 
     return jsonify({'mensagem': "Login realizado com sucesso"})
