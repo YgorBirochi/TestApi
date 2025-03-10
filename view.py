@@ -47,6 +47,20 @@ def livro_post():
         'livro': {'titulo': titulo, 'autor': autor, 'ano_publicado': ano_publicado}
     }), 201
 
+@app.route('/livro_imagem', methods=['POST'])
+def livro_imagem():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'mensagem': 'Token de autenticação necessário'})
+    token = remover_bearer(token)
+
+    try:
+        payload = jwt.decode(token, senha_secreta, algorithms=['HS256'])
+        id_usuario = payload['id_usuario']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'mensagem': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'mensagem': 'Token inválido'}), 401
 
 @app.route('/livro/<int:id>', methods=['PUT'])
 def livro_put(id):
