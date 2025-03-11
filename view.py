@@ -21,23 +21,6 @@ def remover_bearer(token):
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
-    titulo = request.form.get('titulo')
-    autor = request.form.get('autor')
-    ano_publicacao = request.form.get('ano_publicacao')
-    imagem = request.files.get('imagem')
-    cursor.execute(
-        "INSERT INTO livros (TITULO, AUTOR, ANO_PUBLICACAO) VALUES (?, ?, ?) RETURNING ID_livro",
-        (titulo, autor, ano_publicacao)
-    )
-    livro_id = cursor.fetchone()[0]
-    con.commit()
-    if imagem:
-        nome_imagem = f"{livro_id}.jpeg"
-        pasta_destino = os.path.join(app.config['UPLOAD_FOLDER'], "Livros")
-        os.makedirs(pasta_destino, exist_ok=True)
-        imagem_path = os.path.join(pasta_destino, nome_imagem)
-        imagem.save(imagem_path)
-    
 
 # ======================================
 # Rotas de Livros
@@ -115,8 +98,7 @@ def atualizar_livro(id):
         if not token:
             return jsonify({'mensagem': 'Token necessário'}), 401
         jwt.decode(token, senha_secreta, algorithms=['HS256'])
-        
-        data = request.get_json()
+
         data = request.get_json()
         cur = con.cursor()
         
